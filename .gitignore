@@ -1,0 +1,8 @@
+# FAF replay raw data (per-replay summaries)
+replays-analysis/**/AL04.csv
+replays-analysis/**/EL04.csv
+replays-analysis/**/UL04.csv
+replays-analysis/**/GL04.json
+
+# Replay binary files
+*.fafreplay 
