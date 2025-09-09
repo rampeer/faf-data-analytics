@@ -1,13 +1,27 @@
 # FAF Replay Analytics: Data‑Driven Insights
 
-NB: Attend, adepts. The machine‑spirits were bound with sacred seals, soothed by incense, and compelled to reveal their secrets beneath the cog‑sigil of a vigilant Tech‑Priest. Binary hymns were sung. Errors were cast out. Truth was distilled. All cogitations and code herein have been reviewed and formally sanctioned by a Tech‑Priest.
+NB: Attend, adepts. The machine‑spirits were bound with sacred seals, soothed by incense, and compelled to reveal their secrets beneath the cog‑sigil of a vigilant Tech‑Priest. Binary hymns were sung. Errors were cast out. Truth was distilled. All cogitations and code herein have been reviewed and formally sanctioned by an experienced Tech‑Priest.
 
 Within this sanctum we dissect Supreme Commander: Forged Alliance Forever (FAF) replays to wrench signal from the void: hard numbers, sober counsel, and curious surprises fit for presentation to the Balance Conclave. Our current rites hunt and expose transport‑borne drops of T3 land engines—most notably the Brick (`xrl0305`) and the Percival (`xel0305`)—projecting their paths upon the holy minimap and tabulating their deeds.
 
-See `replays-analysis/DATA_DESCRIPTION.md` for detailed field descriptions.
-
+## End‑to‑end pipeline (quick start)
+1) Detect drops (defaults include hardened filters: speed floor, dwell, displacement):
+```bash
+python analysis/drop_detection.py --root replays-analysis --quantile 0.90 --out-dir analysis/outputs
+```
+2) Visualize arrows + rating histograms, and print the uid with most drops:
+```bash
+python analysis/drop_vis.py --map-image analysis/setons.jpg --alpha 0.20 --bounds 0,1024,0,1024
+```
+3) (Optional) Inspect a specific replay to validate drops and render its own overlay:
+```bash
+python analysis/replay_inspect.py --uid 22646201 --map-image analysis/setons.jpg --drop-csv analysis/outputs/drop_events.csv
+```
 
 ## Data layout
+
+See `replays-analysis/DATA_DESCRIPTION.md` for detailed field descriptions.
+
 Place replay exports under `replays-analysis/<uid>/`:
 ```
 replays-analysis/
@@ -39,13 +53,10 @@ python analysis/drop_detection.py \
   --root replays-analysis \
   --quantile 0.90 \
   --min-duration-s 2.0 \
-  --min-displacement 50 \
+  --min-displacement 200 \
   --out-dir analysis/outputs
 ```
-Outputs: `drop_events.csv` (+ optional speed histograms).
-
-Tip: lower `--quantile` to detect more drops; raise it to be stricter.
-
+Defaults also enforce: `--min-transport-speed 3.6`, `--post-dwell-s 3`, `--post-dwell-speed 3.0` (tune if needed).
 
 ### 2) Visualize drops and ratings
 Overlay semi‑transparent arrows on the minimap (Brick=red, Percival=dark navy). Plot rating histograms and print the replay with the most drops.
@@ -59,7 +70,6 @@ By default, bounds are derived from ALL units in `UL04.csv` (robust 1%–99% qua
 
 Outputs: `drop_arrows.png`, `rating_hist.png`, `drop_stats.csv`.
 
-
 ### 3) Inspect a single replay
 List every detected drop (time, owner, unit, coordinates) and render a per‑replay overlay.
 ```bash
@@ -69,7 +79,6 @@ python analysis/replay_inspect.py \
   --drop-csv analysis/outputs/drop_events.csv
 ```
 Output: `replay_drops.png` and a console table with times (mm:ss), owners, and `(x, z)` coordinates.
-
 
 ## Roadmap and questions (Seton’s Clutch)
 For now, the analysis focuses on Seton’s Clutch.

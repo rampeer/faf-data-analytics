@@ -149,6 +149,9 @@ def detect_drop_events_in_file(
 	min_displacement: float,
 	max_tick_gap: Optional[int],
 	unit_ids: Iterable[str],
+	min_transport_speed: float,
+	post_dwell_s: float,
+	post_dwell_speed: float,
 ) -> List[DropEvent]:
 	usecols = [
 		"GameTick",
@@ -207,7 +210,8 @@ def detect_drop_events_in_file(
 		if not math.isfinite(thr):
 			continue
 		# Boolean series marks segments ending at each row
-		is_high = (g["_dt_s"] > 0) & (g["_speed"] >= thr)
+		# High-speed only if both above quantile threshold and absolute floor
+		is_high = (g["_dt_s"] > 0) & (g["_speed"] >= max(thr, min_transport_speed))
 		# Find contiguous regions where is_high is True
 		# We consider transitions in is_high to define segment boundaries
 		prev = False
@@ -244,6 +248,25 @@ def detect_drop_events_in_file(
 				)
 				displacement = math.hypot(dx, dz)
 				if displacement < min_displacement:
+					start_idx = None
+					prev = False
+					continue
+				# Post-drop dwell: ensure unit slows down after drop_idx
+				dwell_ok = True
+				if post_dwell_s > 0:
+					# accumulate dt from drop_idx forward until reaching post_dwell_s threshold
+					acc_s = 0.0
+					j = drop_idx + 1
+					while j < g.shape[0] and acc_s < post_dwell_s:
+						seg_dt = float(g.loc[j, "_dt_s"]) if g.loc[j, "_dt_s"] == g.loc[j, "_dt_s"] else 0.0
+						seg_speed = float(g.loc[j, "_speed"]) if g.loc[j, "_speed"] == g.loc[j, "_speed"] else 0.0
+						# If during dwell window speed exceeds allowed, reject
+						if seg_speed > post_dwell_speed:
+							dwell_ok = False
+							break
+						acc_s += seg_dt
+						j += 1
+				if not dwell_ok:
 					start_idx = None
 					prev = False
 					continue
@@ -356,9 +379,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 	parser = argparse.ArgumentParser(description="Detect transport-like drops for Bricks and Percivals using speed thresholds")
 	parser.add_argument("--root", type=Path, default=Path("replays-analysis"), help="Root folder containing replay subdirectories")
 	parser.add_argument("--quantile", type=float, default=0.9, help="Quantile to set high-speed threshold per unit type")
+	parser.add_argument("--min-transport-speed", type=float, default=3.6, help="Absolute speed floor to consider transport (map units/s); must exceed ground max (~2.95)")
 	parser.add_argument("--min-duration-s", type=float, default=2.0, help="Minimum duration of high-speed segment to count as transport")
-	parser.add_argument("--min-displacement", type=float, default=50.0, help="Minimum pickup->drop displacement (map units)")
+	parser.add_argument("--min-displacement", type=float, default=200.0, help="Minimum pickup->drop displacement (map units)")
 	parser.add_argument("--max-tick-gap", type=int, default=1800, help="Ignore segments with delta ticks greater than this (None to disable)")
+	parser.add_argument("--post-dwell-s", type=float, default=3.0, help="Require at least this many seconds of low speed after drop to confirm unload")
+	parser.add_argument("--post-dwell-speed", type=float, default=3.0, help="Max speed during dwell (map units/s); set ~1.0–1.5× ground speed")
 	parser.add_argument("--hist-bins", type=int, default=120, help="Number of bins for histograms")
 	parser.add_argument("--out-dir", type=Path, default=Path("analysis/outputs"), help="Output directory for artifacts")
 	args = parser.parse_args(argv)
@@ -384,6 +410,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 			min_displacement=args.min_displacement,
 			max_tick_gap=None if args.max_tick_gap <= 0 else args.max_tick_gap,
 			unit_ids=unit_ids,
+			min_transport_speed=args.min_transport_speed,
+			post_dwell_s=args.post_dwell_s,
+			post_dwell_speed=args.post_dwell_speed,
 		)
 		if file_events:
 			all_events.extend(file_events)
